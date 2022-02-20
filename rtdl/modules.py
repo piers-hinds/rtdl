@@ -645,6 +645,8 @@ class ResNet(nn.Module):
             x = self.dropout_second(x)
             if self.skip_connection:
                 x = x_input + x
+            else:
+                x = x_input * x
             return x
 
     class Head(nn.Module):
@@ -709,8 +711,24 @@ class ResNet(nn.Module):
                 for _ in range(n_blocks)
             ]
         )
+        self.blocks2 = nn.Sequential(
+            *[
+                ResNet.Block(
+                    d_main=d_main,
+                    d_hidden=d_hidden,
+                    bias_first=True,
+                    bias_second=True,
+                    dropout_first=dropout_first,
+                    dropout_second=dropout_second,
+                    normalization=normalization,
+                    activation=activation,
+                    skip_connection=False,
+                )
+                for _ in range(n_blocks)
+            ]
+        )
         self.head = ResNet.Head(
-            d_in=d_main,
+            d_in=d_main*2,
             d_out=d_out,
             bias=True,
             normalization=normalization,
@@ -761,7 +779,9 @@ class ResNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.first_layer(x)
-        x = self.blocks(x)
+        x1 = self.blocks(x)
+        x2 = self.blocks2(x)
+        x = torch.cat([x1, x2], dim=-1)
         x = self.head(x)
         return x
 
